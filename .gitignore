@@ -13,6 +13,7 @@
 nlohmann/
 CJ_DEBUG/
 dllmain.cpp
+aCodjumper*
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
