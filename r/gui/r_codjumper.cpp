@@ -2,6 +2,7 @@
 #include "r_codjumper.hpp"
 #include "net/nvar_table.hpp"
 #include <r/gui/r_main_gui.hpp>
+#include <iostream>
 
 
 CCodJumperWindow::CCodJumperWindow(const std::string& name)
@@ -11,14 +12,17 @@ CCodJumperWindow::CCodJumperWindow(const std::string& name)
 
 void CCodJumperWindow::Render()
 {
-	auto table = NVarTables::Get(NVAR_TABLE_NAME);
+	const auto table = NVarTables::Get(NVAR_TABLE_NAME);
+	if (!table)
+		return;
 
-	for (auto& v : *table) {
+	for (const auto& v : *table) {
 
-		auto& [key, value] = v;
+		const auto& [key, value] = v;
 
-		if (value->IsImNVar()) {
+		if (value && value->IsImNVar()) {
 			std::string _v_ = key + "_menu";
+
 			ImGui::BeginChild(_v_.c_str(), ImVec2(0, 0), ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Border);
 			value->RenderImNVar();
 			ImGui::EndChild();

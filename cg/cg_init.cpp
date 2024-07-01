@@ -22,41 +22,41 @@ return 0;
 
 void NVar_CreateVars(NVarTable * table)
 {
-    ImNVar<bool>* Strafebot = table->AddImNvar<bool, ImCheckbox>("Strafebot", false, bool_to_string);
+    ImNVar<bool>* Strafebot = table->AddImNvar<bool, ImCheckbox>("Strafebot", false, NVar_ArithmeticToString<bool>);
     {
-        Strafebot->AddImChild<int, ImDragInt>("Persistence (ms)", 250, arithmetic_to_string<int>, 0, 2000);
-        Strafebot->AddImChild<bool, ImCheckbox>("Fullbeat only", true, bool_to_string);
+        Strafebot->AddImChild<int, ImDragInt>("Persistence (ms)", 250, NVar_ArithmeticToString<int>, 0, 2000);
+        Strafebot->AddImChild<bool, ImCheckbox>("Fullbeat only", true, NVar_ArithmeticToString<bool>);
 
-        ImNVar<bool>* AutoPara = Strafebot->AddImChild<bool, ImCheckbox>("Auto Para", true, bool_to_string);
+        ImNVar<bool>* AutoPara = Strafebot->AddImChild<bool, ImCheckbox>("Auto Para", true, NVar_ArithmeticToString<bool>);
         {
-            AutoPara->AddImChild<bool, ImCheckbox>("Before Bounce", true, bool_to_string);
-            AutoPara->AddImChild<bool, ImCheckbox>("After Bounce", true, bool_to_string);
+            AutoPara->AddImChild<bool, ImCheckbox>("Before Bounce", true, NVar_ArithmeticToString<bool>);
+            AutoPara->AddImChild<bool, ImCheckbox>("After Bounce", true, NVar_ArithmeticToString<bool>);
         }
 
-        ImNVar<bool>* Force250 = Strafebot->AddImChild<bool, ImCheckbox>("Force 250fps", false, bool_to_string);
+        ImNVar<bool>* Force250 = Strafebot->AddImChild<bool, ImCheckbox>("Force 250fps", false, NVar_ArithmeticToString<bool>);
         {
-            Force250->AddImChild<bool, ImCheckbox>("Before Bounce", true, bool_to_string);
-            Force250->AddImChild<bool, ImCheckbox>("After Bounce", true, bool_to_string);
+            Force250->AddImChild<bool, ImCheckbox>("Before Bounce", true, NVar_ArithmeticToString<bool>);
+            Force250->AddImChild<bool, ImCheckbox>("After Bounce", true, NVar_ArithmeticToString<bool>);
         }
 
     }
 
-    ImNVar<bool>* autofps = table->AddImNvar<bool, ImCheckbox>("AutoFPS", false, bool_to_string);
+    ImNVar<bool>* autofps = table->AddImNvar<bool, ImCheckbox>("AutoFPS", false, NVar_ArithmeticToString<bool>);
     {
-        autofps->AddImChild<bool, ImCheckbox>("Long 125", true, bool_to_string);
+        autofps->AddImChild<bool, ImCheckbox>("Long 125", true, NVar_ArithmeticToString<bool>);
 
-        ImNVar<bool>* draw_hud = autofps->AddImChild<bool, ImCheckbox>("Draw HUD", false, bool_to_string);
+        ImNVar<bool>* draw_hud = autofps->AddImChild<bool, ImCheckbox>("Draw HUD", false, NVar_ArithmeticToString<bool>);
         {
-            draw_hud->AddImChild<bool, ImCheckbox>("FPS", false, bool_to_string);
-            draw_hud->AddImChild<bool, ImCheckbox>("Zones", false, bool_to_string);
+            draw_hud->AddImChild<bool, ImCheckbox>("FPS", false, NVar_ArithmeticToString<bool>);
+            draw_hud->AddImChild<bool, ImCheckbox>("Zones", false, NVar_ArithmeticToString<bool>);
         }
 
-        autofps->AddImChild<bool, ImCheckbox>("+gostand 333fps", false, bool_to_string);
+        autofps->AddImChild<bool, ImCheckbox>("+gostand 333fps", false, NVar_ArithmeticToString<bool>);
 
     }
 
-    table->AddImNvar<bool, ImCheckbox>("RPG Lookdown", false, bool_to_string);
-    table->AddImNvar<bool, ImCheckbox>("Bhop", false, bool_to_string);
+    table->AddImNvar<bool, ImCheckbox>("RPG Lookdown", false, NVar_ArithmeticToString<bool>);
+    table->AddImNvar<bool, ImCheckbox>("Bhop", false, NVar_ArithmeticToString<bool>);
 
 }
 
@@ -136,6 +136,7 @@ using PE_EXPORT = std::unordered_map<std::string, DWORD>;
 #include <shared/sv_shared.hpp>
 #include <utils/hook.hpp>
 #include <utils/errors.hpp>
+#include <iostream>
 
 using json = nlohmann::json;
 
@@ -162,6 +163,8 @@ dll_export void L(void* data) {
         return FatalError(std::format("couldn't get a critical function"));
     }
     using shared = CMain::Shared;
+
+    //std::this_thread::sleep_for(500ms);
 
     ImGui::SetCurrentContext(shared::GetFunctionOrExit("GetContext")->As<ImGuiContext*>()->Call());
 }
