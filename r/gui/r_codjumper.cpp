@@ -3,6 +3,7 @@
 #include "net/nvar_table.hpp"
 #include <r/gui/r_main_gui.hpp>
 #include <iostream>
+#include <shared/sv_shared.hpp>
 
 
 CCodJumperWindow::CCodJumperWindow(const std::string& name)
@@ -12,6 +13,19 @@ CCodJumperWindow::CCodJumperWindow(const std::string& name)
 
 void CCodJumperWindow::Render()
 {
+
+#if(!DEBUG_SUPPORT)
+	static auto func = CMain::Shared::GetFunctionSafe("GetContext");
+
+	if (!func) {
+		func = CMain::Shared::GetFunctionSafe("GetContext");
+		return;
+	}
+
+	ImGui::SetCurrentContext(func->As<ImGuiContext*>()->Call());
+
+#endif
+
 	const auto table = NVarTables::Get(NVAR_TABLE_NAME);
 	if (!table)
 		return;

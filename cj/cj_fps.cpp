@@ -189,7 +189,7 @@ void CJ_AutoFPS(usercmd_s* cmd)
 		return;
 
 	dvar_s* com_maxfps = Dvar_FindMalleableVar("com_maxfps");
-	const bool spacebar333 = NVar_FindMalleableVar<bool>("AutoFPS")->GetChild("+gostand 333fps")->As<ImNVar<bool>>()->Get();
+	const bool spacebar333 = NVar_FindMalleableVar<bool>("AutoFPS")->GetChild("gostand 333fps")->As<ImNVar<bool>>()->Get();
 
 	if (spacebar333 && (cmd->buttons & cmdEnums::jump) != 0)
 		com_maxfps->current.integer = 333;

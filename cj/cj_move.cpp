@@ -38,7 +38,7 @@ void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 		CJ_Force250(ps, cmd);
 
 	const bool rightmove_was_pressed_this_frame = cmd->rightmove != NULL;
-	const auto persistence = NVar_FindMalleableVar<bool>("Strafebot")->GetChild("Persistence (ms)")->As<ImNVar<int>>()->Get();
+	const auto persistence = NVar_FindMalleableVar<bool>("Strafebot")->GetChild("Persistence ms")->As<ImNVar<int>>()->Get();
 	const auto fullbeat_only = NVar_FindMalleableVar<bool>("Strafebot")->GetChild("Fullbeat only")->As<ImNVar<bool>>()->Get();
 
 	if (fullbeat_only) {

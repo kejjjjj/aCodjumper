@@ -49,6 +49,8 @@ void CG_CreateHooks()
 	hooktable::preserver<void>(HOOK_PREFIX("CL_ShutdownRenderer"), 0x46CA40, CL_ShutdownRenderer);
 	hooktable::preserver<LRESULT, HWND, UINT, WPARAM, LPARAM>(HOOK_PREFIX("WndProc"), COD4X::get() ? COD4X::get() + 0x801D6 : 0x57BB20, WndProc);
 
+	hooktable::preserver<void>(HOOK_PREFIX("CG_Cleanup"), 0x477210, CG_Cleanup);
+
 	if (COD4X::get()) {
 		hooktable::preserver<int, msg_t*>(HOOK_PREFIX("MSG_ParseServerCommand"), COD4X::get() + 0x12D6B, COD4X::MSG_ParseServerCommand);
 	}

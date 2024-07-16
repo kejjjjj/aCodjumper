@@ -1,18 +1,19 @@
-#include "cg_init.hpp"
+#include "cg/cg_cleanup.hpp"
+#include "cg/cg_local.hpp"
+#include "cg/cg_offsets.hpp"
 #include "cg_hooks.hpp"
-
-#include "utils/engine.hpp"
-#include <net/nvar_table.hpp>
-
+#include "cg_init.hpp"
+#include "cmd/cmd.hpp"
+#include "cod4x/cod4x.hpp"
+#include "net/im_defaults.hpp"
+#include "net/nvar_table.hpp"
+#include "r/gui/r_codjumper.hpp"
 #include "r/r_drawactive.hpp"
-#include <cmd/cmd.hpp>
-
 #include "shared/sv_shared.hpp"
-#include <net/im_defaults.hpp>
+#include "sys/sys_thread.hpp"
+#include "utils/engine.hpp"
+#include "utils/hook.hpp"
 #include <thread>
-#include <cod4x/cod4x.hpp>
-
-#include <r/gui/r_codjumper.hpp>
 
 using namespace std::chrono_literals;
 
@@ -24,7 +25,7 @@ void NVar_CreateVars(NVarTable * table)
 {
     ImNVar<bool>* Strafebot = table->AddImNvar<bool, ImCheckbox>("Strafebot", false, NVar_ArithmeticToString<bool>);
     {
-        Strafebot->AddImChild<int, ImDragInt>("Persistence (ms)", 250, NVar_ArithmeticToString<int>, 0, 2000);
+        Strafebot->AddImChild<int, ImDragInt>("Persistence ms", 250, NVar_ArithmeticToString<int>, 0, 2000);
         Strafebot->AddImChild<bool, ImCheckbox>("Fullbeat only", true, NVar_ArithmeticToString<bool>);
 
         ImNVar<bool>* AutoPara = Strafebot->AddImChild<bool, ImCheckbox>("Auto Para", true, NVar_ArithmeticToString<bool>);
@@ -51,7 +52,7 @@ void NVar_CreateVars(NVarTable * table)
             draw_hud->AddImChild<bool, ImCheckbox>("Zones", false, NVar_ArithmeticToString<bool>);
         }
 
-        autofps->AddImChild<bool, ImCheckbox>("+gostand 333fps", false, NVar_ArithmeticToString<bool>);
+        autofps->AddImChild<bool, ImCheckbox>("gostand 333fps", false, NVar_ArithmeticToString<bool>);
 
     }
 
@@ -61,18 +62,25 @@ void NVar_CreateVars(NVarTable * table)
 }
 
 #if(DEBUG_SUPPORT)
+#include "cg/cg_memory.hpp"
 #include "cmd/cmd.hpp"
-#include "cg/cg_local.hpp"
-#include "cg/cg_offsets.hpp"
-#include <r/gui/r_main_gui.hpp>
-
-
+#include "r/gui/r_main_gui.hpp"
 
 void CG_Init()
 {
+
+    while (!dx || !dx->device)
+        std::this_thread::sleep_for(100ms);
+
+    Sys_SuspendAllThreads();
+    std::this_thread::sleep_for(300ms);
+
     COD4X::initialize();
-    CG_CreatePermaHooks();
     
+    if (!CStaticMainGui::Owner->Initialized()) {
+#pragma warning(suppress : 6011)
+        CStaticMainGui::Owner->Init(dx->device, FindWindow(NULL, COD4X::get() ? "Call of Duty 4 X" : "Call of Duty 4"));
+    }
 
 
     NVarTables::tables[NVAR_TABLE_NAME] = std::make_unique<NVarTable>(NVAR_TABLE_NAME);
@@ -88,16 +96,25 @@ void CG_Init()
     Cmd_AddCommand("gui", CStaticMainGui::Toggle);
     CStaticMainGui::AddItem(std::make_unique<CCodJumperWindow>(NVAR_TABLE_NAME));
 
-
+    CG_CreatePermaHooks();
+    CG_MemoryTweaks();
+    Sys_ResumeAllThreads();
 }
 
 #else
-#include <cl/cl_move.hpp>
+#include "cl/cl_move.hpp"
 void CG_Init()
 {
     while (!CMain::Shared::AddFunction || !CMain::Shared::GetFunction) {
         std::this_thread::sleep_for(200ms);
     }
+
+    while (!dx || !dx->device)
+        std::this_thread::sleep_for(100ms);
+
+    Sys_SuspendAllThreads();
+    std::this_thread::sleep_for(300ms);
+
     COD4X::initialize();
     NVarTables::tables = CMain::Shared::GetFunctionOrExit("GetNVarTables")->As<nvar_tables_t*>()->Call();
     (*NVarTables::tables)[NVAR_TABLE_NAME] = std::make_unique<NVarTable>(NVAR_TABLE_NAME);
@@ -116,16 +133,24 @@ void CG_Init()
     //add the functions that need to be managed by the main module
     CMain::Shared::GetFunctionOrExit("Queue_CG_DrawActive")->As<void, drawactive_t>()->Call(CG_DrawActive);
     CMain::Shared::GetFunctionOrExit("Queue_CL_FinishMove")->As<void, finishmove_t>()->Call(CL_FinishMove);
+    CMain::Shared::GetFunctionOrExit("Queue_CG_Cleanup")->As<void, cg_cleanup_t>()->Call(CG_Cleanup);
     //CMain::Shared::GetFunctionOrExit("Queue_R_EndScene")->As<void, endscene_t&&>()->Call(R_EndScene);
 
 
     CG_CreatePermaHooks();
 
+    Sys_ResumeAllThreads();
+
 }
 #endif
+
 void CG_Cleanup()
 {
-    CG_ReleaseHooks();
+#if(DEBUG_SUPPORT)
+    hooktable::find<void>(HOOK_PREFIX(__func__))->call();
+#endif
+
+    CG_SafeExit();
 }
 
 #if(!DEBUG_SUPPORT)
