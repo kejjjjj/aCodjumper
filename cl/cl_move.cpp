@@ -39,7 +39,7 @@ void CL_FinishMove(usercmd_s* cmd)
 		CJ_AutoFPS(cmd);
 		CJ_AutoRPG(ps, cmd, oldcmd);
 		CJ_Bhop(ps, cmd, oldcmd);
-
+		CJ_Prediction(ps, cmd, oldcmd);
 	}
 
 	return;

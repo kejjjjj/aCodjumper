@@ -1,15 +1,16 @@
-#include "cj_move.hpp"
+#include "bg/bg_pmove.hpp"
+#include "bg/bg_pmove_simulation.hpp"
+#include "cg/cg_angles.hpp"
+#include "cg/cg_client.hpp"
+#include "cg/cg_local.hpp"
+#include "cg/cg_offsets.hpp"
 #include "cj_fps.hpp"
-#include <cg/cg_angles.hpp>
-#include <cg/cg_client.hpp>
-#include <net/nvar_table.hpp>
-#include <cl/cl_move.hpp>
-#include <com/com_channel.hpp>
+#include "cj_move.hpp"
+#include "cl/cl_move.hpp"
+#include "cl/cl_utils.hpp"
+#include "com/com_channel.hpp"
 #include "dvar/dvar.hpp"
-#include <bg/bg_pmove.hpp>
-#include <cg/cg_local.hpp>
-#include <cg/cg_offsets.hpp>
-#include <cl/cl_utils.hpp>
+#include "net/nvar_table.hpp"
 
 void CJ_FixedTime(usercmd_s* cmd, usercmd_s* oldcmd)
 {
@@ -256,7 +257,7 @@ bool CJ_ForceStrafeInFPS(playerState_s* ps, usercmd_s* cmd, const int target_fps
 	cmd->rightmove = _rightmove;
 	return true;
 }
-bool CJ_InTransferZone(playerState_s* ps, usercmd_s* cmd)
+bool CJ_InTransferZone(const playerState_s* ps, usercmd_s* cmd)
 {
 
 	constexpr float tested_aa = RAD2DEG(-0.78539f);
@@ -267,14 +268,66 @@ bool CJ_InTransferZone(playerState_s* ps, usercmd_s* cmd)
 
 }
 
-void CJ_Bhop(playerState_s* ps, usercmd_s* cmd, usercmd_s* oldcmd)
+void CJ_Bhop(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd)
 {
 	if (ps->groundEntityNum == 1023)
 		return;
 
 	if (NVar_FindMalleableVar<bool>("Bhop")->Get() && (cmd->buttons & cmdEnums::jump) != 0) {
-		if ((cmd->buttons & cmdEnums::jump) != 0 && (oldcmd->buttons & cmdEnums::jump) != 0)
-			cmd->buttons -= cmdEnums::jump;
+		if ((cmd->buttons & cmdEnums::jump) != 0 && (oldcmd->buttons & cmdEnums::jump) != 0) {
+			cmd->buttons &= ~(cmdEnums::crouch | cmdEnums::crouch_hold);
+			cmd->buttons &= ~cmdEnums::jump;
+		}
+	}
+
+}
+void CJ_Prediction(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd)
+{
+
+	if ((ps->pm_flags & PMF_MANTLE) != 0 || (ps->pm_flags & PMF_LADDER) != 0)
+		return;
+
+	playerState_s ps_local = *ps;
+	auto pm = PM_Create(&ps_local, cmd, oldcmd);
+
+	usercmd_s ccmd = *cmd;
+
+	//10fps
+	ccmd.serverTime = (oldcmd->serverTime + (1000 / 10));
+	ccmd.buttons &= ~cmdEnums::fire;
+
+	CPmoveSimulation sim(&pm);
+	sim.Simulate(&ccmd, oldcmd);
+
+	auto pml = sim.GetPML();
+
+	if(NVar_FindMalleableVar<bool>("Auto Slide")->Get())
+		CJ_AutoSlide(sim.GetPM(), pml, cmd, ccmd.serverTime);
+	
+	//might not be SUPER perfect because the result is simulated with 10fps!
+	if(NVar_FindMalleableVar<bool>("Edge Jump")->Get())
+		CJ_EdgeJump(ps, &ps_local, cmd);
+
+}
+void CJ_AutoSlide(const pmove_t* pm, const pml_t* pml, usercmd_s* cmd, std::int32_t serverTime)
+{
+	const auto ps = pm->ps;
+
+	const auto goodVel = ps->velocity[2] < 2.f && ps->velocity[2] >= 0.f;
+	const auto goodOrg = (ps->origin[2] <= (ps->jumpOriginZ + 1.f)) || CG_HasBounced(pm->ps);
+
+	
+
+	if (!pml->walking && goodVel && goodOrg && pml->impactSpeed != 0.f) {
+		cmd->serverTime = serverTime;
+	}
+
+}
+void CJ_EdgeJump(const playerState_s* old_ps, const playerState_s* ps, usercmd_s* cmd)
+{
+	if (old_ps->groundEntityNum == 1022 && ps->groundEntityNum == 1023) {
+		cmd->buttons &= ~(cmdEnums::crouch | cmdEnums::crouch_hold);
+		cmd->buttons |= cmdEnums::jump;
 	}
 
 }
