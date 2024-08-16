@@ -1,15 +1,22 @@
+#include "utils/hook.hpp"
+
+#include "cg/cg_local.hpp"
+#include "cg/cg_offsets.hpp"
+#include "cl/cl_utils.hpp"
 #include "cl_move.hpp"
-#include <utils/hook.hpp>
 
-#include <cg/cg_local.hpp>
-#include <cg/cg_offsets.hpp>
-#include <cl/cl_utils.hpp>
+#include "cj/cj_move.hpp"
+#include "cj/cj_fps.hpp"
+#include "cj/cj_rpg.hpp"
 
-#include <cj/cj_move.hpp>
-#include <cj/cj_fps.hpp>
-#include <cj/cj_rpg.hpp>
 
-#include <shared/sv_shared.hpp>
+
+#if(DEBUG_SUPPORT)
+#include "_Modules/aMovementRecorder/movement_recorder/mr_main.hpp"
+#include "_Modules/aMovementRecorder/movement_recorder/mr_playback.hpp"
+#else
+#include "shared/sv_shared.hpp"
+#endif
 
 void CL_FinishMove(usercmd_s* cmd)
 {
@@ -23,24 +30,43 @@ void CL_FinishMove(usercmd_s* cmd)
 #if(!DEBUG_SUPPORT)
 
 	const auto PlaybackActive = CMain::Shared::GetFunctionSafe("PlaybackActive");
+	const auto ElebotActive = CMain::Shared::GetFunctionSafe("ElebotActive");
 
 	//a playback is currently active, so don't overwrite the cmds
-	if (PlaybackActive && PlaybackActive->As<bool>()->Call())
+	if (PlaybackActive && PlaybackActive->As<bool>()->Call() || ElebotActive && ElebotActive->As<bool>()->Call())
 		return;
+
+#else
+	if (CStaticMovementRecorder::GetActivePlayback())
+		return CStaticMovementRecorder::Instance->Update(ps, cmd, oldcmd);
 #endif
 
 	if (ps->pm_type == PM_NORMAL) {
+
+
 #if(DEBUG_SUPPORT)
+		
 		//shouldn't be hardcoded to this module, unless in debug mode
 		CL_FixedTime(cmd, oldcmd);
 #endif
 
-		CJ_Strafebot(cmd, oldcmd);
-		CJ_AutoFPS(cmd);
-		CJ_AutoRPG(ps, cmd, oldcmd);
-		CJ_Bhop(ps, cmd, oldcmd);
-		CJ_Prediction(ps, cmd, oldcmd);
+		if (CJ_Prediction(ps, cmd, oldcmd)) {
+			
+		} else if (CJ_Bhop(ps, cmd, oldcmd)) {
+
+		}
+		else {
+			CJ_Strafebot(cmd, oldcmd);
+			CJ_AutoFPS(cmd);
+			CJ_AutoRPG(ps, cmd, oldcmd);
+		}
+
 	}
+
+#if(DEBUG_SUPPORT)
+	return CStaticMovementRecorder::Instance->Update(ps, cmd, oldcmd);
+#endif
+
 
 	return;
 }

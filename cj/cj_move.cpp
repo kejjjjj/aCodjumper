@@ -12,6 +12,61 @@
 #include "dvar/dvar.hpp"
 #include "net/nvar_table.hpp"
 
+#include "_Modules/aMovementRecorder/movement_recorder/mr_playback.hpp"
+
+#if(DEBUG_SUPPORT)
+#include "_Modules/aMovementRecorder/movement_recorder/mr_main.hpp"
+#else
+#include "shared/sv_shared.hpp"
+#endif
+
+void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[maybe_unused]]bool debugRender)
+{
+
+#if(DEBUG_SUPPORT)
+	CStaticMovementRecorder::PushPlayback(cmds,
+		{
+			.m_eJumpSlowdownEnable= slowdown_t::both,
+			.m_bIgnorePitch = true,
+			.m_bIgnoreWASD = true,
+			.m_bSetComMaxfps = false,
+			.m_bRenderExpectationVsReality = debugRender
+		}
+	);
+#else
+
+	CMain::Shared::GetFunctionOrExit("AddPlaybackC")->As<void, const std::vector<playback_cmd>&, const CPlaybackSettings&>()->Call(
+		cmds,
+		{
+			.m_eJumpSlowdownEnable = slowdown_t::both,
+			.m_bIgnorePitch = true,
+			.m_bIgnoreWASD = true,
+			.m_bSetComMaxfps = false,
+			.m_bRenderExpectationVsReality = false
+		}
+
+	);
+#endif
+
+}
+playback_cmd CJ_StateToPlayback(const playerState_s* ps, const usercmd_s& cmd, const usercmd_s& oldcmd)
+{
+	playback_cmd pcmd;
+	pcmd.buttons = cmd.buttons;
+	pcmd.forwardmove = cmd.forwardmove;
+	pcmd.offhand = cmd.offHandIndex;
+	pcmd.origin = ps->origin;
+	pcmd.rightmove = cmd.rightmove;
+	pcmd.velocity = ps->velocity;
+	pcmd.weapon = cmd.weapon;
+
+	pcmd.oldTime = oldcmd.serverTime;
+	pcmd.serverTime = cmd.serverTime;
+
+	pcmd.cmd_angles = cmd.angles;
+	pcmd.delta_angles = ps->delta_angles;
+	return pcmd;
+}
 void CJ_FixedTime(usercmd_s* cmd, usercmd_s* oldcmd)
 {
 	dvar_s* com_maxfps = Dvar_FindMalleableVar("com_maxfps");
@@ -42,10 +97,6 @@ void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 	const auto persistence = NVar_FindMalleableVar<bool>("Strafebot")->GetChild("Persistence ms")->As<ImNVar<int>>()->Get();
 	const auto fullbeat_only = NVar_FindMalleableVar<bool>("Strafebot")->GetChild("Fullbeat only")->As<ImNVar<bool>>()->Get();
 
-	if (fullbeat_only) {
-		if (cmd->forwardmove != 127 || cmd->rightmove == 0)
-			return;
-	}
 
 	//persistence
 	if (rightmove_was_pressed_this_frame == false) {
@@ -57,6 +108,10 @@ void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 		}
 	}
 
+	if (fullbeat_only) {
+		if (cmd->forwardmove != 127 || cmd->rightmove == 0)
+			return;
+	}
 
 	if ((yaw = CG_GetOptYawDelta(ps, cmd, oldcmd)) == std::nullopt) {
 		return;
@@ -268,10 +323,10 @@ bool CJ_InTransferZone(const playerState_s* ps, usercmd_s* cmd)
 
 }
 
-void CJ_Bhop(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd)
+bool CJ_Bhop(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd)
 {
 	if (ps->groundEntityNum == 1023)
-		return;
+		return false;
 
 	if (NVar_FindMalleableVar<bool>("Bhop")->Get() && (cmd->buttons & cmdEnums::jump) != 0) {
 		if ((cmd->buttons & cmdEnums::jump) != 0 && (oldcmd->buttons & cmdEnums::jump) != 0) {
@@ -280,54 +335,128 @@ void CJ_Bhop(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd)
 		}
 	}
 
+	return false;
 }
-void CJ_Prediction(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd)
+bool CJ_Prediction(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd)
 {
 
 	if ((ps->pm_flags & PMF_MANTLE) != 0 || (ps->pm_flags & PMF_LADDER) != 0)
+		return false;
+
+	const auto autoSlide = NVar_FindMalleableVar<bool>("Auto Slide")->Get();
+	const auto edgeJump = NVar_FindMalleableVar<bool>("Edge Jump")->Get();
+
+	//don't calculate for no reason
+	if (!autoSlide && !edgeJump)
+		return false;
+
+	const auto bGrounded = CG_IsOnGround(ps);
+
+	if (!bGrounded && autoSlide && CJ_AutoSlide(ps, cmd, oldcmd))
+		return true;
+	
+	if(bGrounded && edgeJump)
+		CJ_EdgeJump(ps, cmd, cmd);
+
+	return false;
+
+}
+bool CJ_AutoSlide(const playerState_s* _ps, usercmd_s* cmd, const usercmd_s* oldcmd)
+{
+	playerState_s ps_local = *_ps;
+	auto pm = PM_Create(&ps_local, cmd, cmd);
+	const auto ps = pm.ps;
+
+	PM_Weapon_Idle(pm.ps);
+
+	const auto frameTime = (cmd->serverTime - oldcmd->serverTime);
+
+	CPmoveSimulation sim(&pm);
+	const auto pml = sim.GetPML();
+	sim.FPS = 10;
+	sim.Simulate();
+
+
+	const auto goodVel = ps->velocity[2] < 10.f && ps->velocity[2] >= 0.f;
+	const auto goodOrg = _ps->origin[Z] >= ps->origin[Z];
+
+	if (!pml->walking && goodVel && goodOrg && pml->impactSpeed != 0.f) {
+		const auto firstCmd = CJ_StateToPlayback(pm.ps, pm.cmd, pm.oldcmd);
+
+		pm.oldcmd.serverTime = pm.cmd.serverTime;
+		pm.cmd.serverTime += frameTime;
+
+		const auto secondCmd = CJ_StateToPlayback(pm.ps, pm.cmd, pm.oldcmd);
+
+		CJ_PushPlayback({ firstCmd, secondCmd });
+		return true;
+	}
+
+	return false;
+
+}
+void CJ_EdgeJump(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd)
+{
+	if ((cmd->buttons & cmdEnums::jump) != 0)
 		return;
 
 	playerState_s ps_local = *ps;
 	auto pm = PM_Create(&ps_local, cmd, oldcmd);
+	PM_Weapon_Idle(pm.ps);
 
 	usercmd_s ccmd = *cmd;
-
-	//10fps
-	ccmd.serverTime = (oldcmd->serverTime + (1000 / 10));
-	ccmd.buttons &= ~cmdEnums::fire;
-
+	ccmd.buttons &= ~cmdEnums::jump;
 	CPmoveSimulation sim(&pm);
+	sim.FPS = Dvar_FindMalleableVar("com_maxfps")->current.integer;
 	sim.Simulate(&ccmd, oldcmd);
 
-	auto pml = sim.GetPML();
-
-	if(NVar_FindMalleableVar<bool>("Auto Slide")->Get())
-		CJ_AutoSlide(sim.GetPM(), pml, cmd, ccmd.serverTime);
-	
-	//might not be SUPER perfect because the result is simulated with 10fps!
-	if(NVar_FindMalleableVar<bool>("Edge Jump")->Get())
-		CJ_EdgeJump(ps, &ps_local, cmd);
-
-}
-void CJ_AutoSlide(const pmove_t* pm, const pml_t* pml, usercmd_s* cmd, std::int32_t serverTime)
-{
-	const auto ps = pm->ps;
-
-	const auto goodVel = ps->velocity[2] < 2.f && ps->velocity[2] >= 0.f;
-	const auto goodOrg = (ps->origin[2] <= (ps->jumpOriginZ + 1.f)) || CG_HasBounced(pm->ps);
-
-	
-
-	if (!pml->walking && goodVel && goodOrg && pml->impactSpeed != 0.f) {
-		cmd->serverTime = serverTime;
-	}
-
-}
-void CJ_EdgeJump(const playerState_s* old_ps, const playerState_s* ps, usercmd_s* cmd)
-{
-	if (old_ps->groundEntityNum == 1022 && ps->groundEntityNum == 1023) {
+	//current frame is on the ground and the next frame isn't
+	if (ps->groundEntityNum == 1022 && pm.ps->groundEntityNum == 1023) {
 		cmd->buttons &= ~(cmdEnums::crouch | cmdEnums::crouch_hold);
 		cmd->buttons |= cmdEnums::jump;
 	}
 
 }
+
+/*
+static bool CJ_PlayerWillBeOnTheGroundAfterFrame(const playerState_s* _ps, const usercmd_s* cmd, const std::int32_t fps)
+{
+	if (CG_IsOnGround(_ps))
+		return true;
+
+	playerState_s ps_local = *_ps;
+	auto pm = PM_Create(&ps_local, cmd, cmd);
+	CPmoveSimulation sim(&pm);
+
+	sim.FPS = fps == 0 ? 1000 : fps;
+	sim.Simulate();
+
+	return pm.ps->velocity[Z] >= 0.f && !sim.GetPML()->walking;
+}
+
+
+static bool CJ_WillPlayerSlideOnTheSurface(const playerState_s* _ps, const usercmd_s* cmd, std::int32_t fps)
+{
+
+	playerState_s ps_local = *_ps;
+	auto pm = PM_Create(&ps_local, cmd, cmd);
+	const auto ps = pm.ps;
+
+	CPmoveSimulation sim(&pm);
+	sim.FPS = fps == 0 ? 1000 : fps;
+	sim.Simulate();
+	const auto pml = sim.GetPML();
+
+	if (ps->velocity[Z] >= 0.f && !pml->walking) {
+
+		const auto newVelocity = fvec2(pm.ps->velocity).mag();
+		const auto oldVelocity = fvec2(_ps->velocity).mag();
+
+		Com_Printf("velDelta: %.6f\n", (newVelocity / oldVelocity) * 100.f);
+		return true;
+	}
+
+	return false;
+}
+
+*/

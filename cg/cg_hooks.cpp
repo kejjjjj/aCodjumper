@@ -13,13 +13,16 @@
 
 #include "cg/cg_local.hpp"
 #include "cg/cg_offsets.hpp"
+
 #include <thread>
 #include <chrono>
+
 using namespace std::chrono_literals;
 
 #if(DEBUG_SUPPORT)
 #include "r/gui/r_gui.hpp"
 #include "cg/cg_memory.hpp"
+#include "r/backend/rb_endscene.hpp"
 #endif
 
 static void CG_CreateHooks();
@@ -43,6 +46,7 @@ void CG_CreateHooks()
 	hooktable::preserver<void, usercmd_s*>(HOOK_PREFIX("CL_FinishMove"), 0x463A60u, CL_FinishMove);
 	hooktable::preserver<void>(HOOK_PREFIX("CG_DrawActive"), COD4X::get() ? COD4X::get() + 0x5464 : 0x42F7F0, CG_DrawActive);
 
+	hooktable::preserver<void, GfxViewParms*>(HOOK_PREFIX("RB_DrawDebug"), 0x658860, RB_DrawDebug);
 #endif
 
 }
