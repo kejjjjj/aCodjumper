@@ -25,40 +25,44 @@ void NVar_CreateVars(NVarTable * table)
 {
     ImNVar<bool>* Strafebot = table->AddImNvar<bool, ImCheckbox>("Strafebot", false, NVar_ArithmeticToString<bool>);
     {
-        Strafebot->AddImChild<int, ImDragInt>("Persistence ms", 250, NVar_ArithmeticToString<int>, 0, 2000)
+        Strafebot->AddImChild<int, ImDragInt>("Persistence ms", 250, NVar_ArithmeticToString<int>, nvar_saved, 0, 2000)
             ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "how long the strafebot will keep pressing these keys after releasing the input");
 
-        Strafebot->AddImChild<bool, ImCheckbox>("Fullbeat only", true, NVar_ArithmeticToString<bool>);
+        Strafebot->AddImChild<float, ImDragFloat>("Smoothing", 0.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 0.9999f, "%.2f")
+            ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "more smoothing = less acceleration");
 
-        ImNVar<bool>* AutoPara = Strafebot->AddImChild<bool, ImCheckbox>("Auto Para", true, NVar_ArithmeticToString<bool>);
+
+        Strafebot->AddImChild<bool, ImCheckbox>("Fullbeat only", true, NVar_ArithmeticToString<bool>, nvar_saved);
+
+        ImNVar<bool>* AutoPara = Strafebot->AddImChild<bool, ImCheckbox>("Auto Para", true, NVar_ArithmeticToString<bool>, nvar_saved);
         AutoPara->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "force strafes in the 333 zone as long as possible");
 
         {
-            AutoPara->AddImChild<bool, ImCheckbox>("Before Bounce", true, NVar_ArithmeticToString<bool>);
-            AutoPara->AddImChild<bool, ImCheckbox>("After Bounce", true, NVar_ArithmeticToString<bool>);
+            AutoPara->AddImChild<bool, ImCheckbox>("Before Bounce", true, NVar_ArithmeticToString<bool>, nvar_saved);
+            AutoPara->AddImChild<bool, ImCheckbox>("After Bounce", true, NVar_ArithmeticToString<bool>, nvar_saved);
         }
 
-        ImNVar<bool>* Force250 = Strafebot->AddImChild<bool, ImCheckbox>("Force 250fps", false, NVar_ArithmeticToString<bool>);
+        ImNVar<bool>* Force250 = Strafebot->AddImChild<bool, ImCheckbox>("Force 250fps", false, NVar_ArithmeticToString<bool>, nvar_saved);
         Force250->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "force strafes in the 250 zone as long as possible");
         {
-            Force250->AddImChild<bool, ImCheckbox>("Before Bounce", true, NVar_ArithmeticToString<bool>);
-            Force250->AddImChild<bool, ImCheckbox>("After Bounce", true, NVar_ArithmeticToString<bool>);
+            Force250->AddImChild<bool, ImCheckbox>("Before Bounce", true, NVar_ArithmeticToString<bool>, nvar_saved);
+            Force250->AddImChild<bool, ImCheckbox>("After Bounce", true, NVar_ArithmeticToString<bool>, nvar_saved);
         }
 
     }
 
     ImNVar<bool>* autofps = table->AddImNvar<bool, ImCheckbox>("AutoFPS", false, NVar_ArithmeticToString<bool>);
     {
-        autofps->AddImChild<bool, ImCheckbox>("Long 125", true, NVar_ArithmeticToString<bool>)
+        autofps->AddImChild<bool, ImCheckbox>("Long 125", true, NVar_ArithmeticToString<bool>, nvar_saved)
             ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "125fps will overwrite some of 333");
 
-        ImNVar<bool>* draw_hud = autofps->AddImChild<bool, ImCheckbox>("Draw HUD", false, NVar_ArithmeticToString<bool>);
+        ImNVar<bool>* draw_hud = autofps->AddImChild<bool, ImCheckbox>("Draw HUD", false, NVar_ArithmeticToString<bool>, nvar_saved);
         {
-            draw_hud->AddImChild<bool, ImCheckbox>("FPS", false, NVar_ArithmeticToString<bool>);
-            draw_hud->AddImChild<bool, ImCheckbox>("Zones", false, NVar_ArithmeticToString<bool>);
+            draw_hud->AddImChild<bool, ImCheckbox>("FPS", false, NVar_ArithmeticToString<bool>, nvar_saved);
+            draw_hud->AddImChild<bool, ImCheckbox>("Zones", false, NVar_ArithmeticToString<bool>, nvar_saved);
         }
 
-        autofps->AddImChild<bool, ImCheckbox>("gostand 333fps", false, NVar_ArithmeticToString<bool>)
+        autofps->AddImChild<bool, ImCheckbox>("gostand 333fps", false, NVar_ArithmeticToString<bool>, nvar_saved)
             ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "holding your jump key will switch to 333fps");
 
 

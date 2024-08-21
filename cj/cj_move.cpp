@@ -94,8 +94,12 @@ void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 		CJ_Force250(ps, cmd);
 
 	const bool rightmove_was_pressed_this_frame = cmd->rightmove != NULL;
-	const auto persistence = NVar_FindMalleableVar<bool>("Strafebot")->GetChild("Persistence ms")->As<ImNVar<int>>()->Get();
-	const auto fullbeat_only = NVar_FindMalleableVar<bool>("Strafebot")->GetChild("Fullbeat only")->As<ImNVar<bool>>()->Get();
+
+	const auto Strafebot = NVar_FindMalleableVar<bool>("Strafebot");
+
+	const auto persistence = Strafebot->GetChild("Persistence ms")->As<ImNVar<int>>()->Get();
+	const auto fullbeat_only = Strafebot->GetChild("Fullbeat only")->As<ImNVar<bool>>()->Get();
+	const auto smoothing = Strafebot->GetChild("Smoothing")->As<ImNVar<float>>()->Get();
 
 
 	//persistence
@@ -122,10 +126,11 @@ void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 		time_when_key_pressed = cmd->serverTime;
 		most_recent_rightmove = cmd->rightmove;
 	}
-	const float delta = yaw.value();
 
-	//if (std::fabsf(delta) > 1.f)
-	//	delta = CG_SmoothAngle(0.f, delta, 0.1f);
+	auto delta = *yaw;
+
+	if (std::fabsf(delta) > 5.f)
+		delta = CG_SmoothAngle(0.f, delta, smoothing);
 
 	CL_SetPlayerYaw(cmd, ps->delta_angles, ps->viewangles[YAW] + delta);
 }
@@ -323,10 +328,8 @@ bool CJ_InTransferZone(const playerState_s* ps, usercmd_s* cmd)
 
 }
 
-bool CJ_Bhop(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd)
+bool CJ_Bhop([[maybe_unused]]const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd)
 {
-	if (ps->groundEntityNum == 1023)
-		return false;
 
 	if (NVar_FindMalleableVar<bool>("Bhop")->Get() && (cmd->buttons & cmdEnums::jump) != 0) {
 		if ((cmd->buttons & cmdEnums::jump) != 0 && (oldcmd->buttons & cmdEnums::jump) != 0) {
@@ -417,46 +420,48 @@ void CJ_EdgeJump(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcm
 	}
 
 }
+//
+//static bool CJ_PlayerWillBeOnTheGroundAfterFrame(const playerState_s* _ps, const usercmd_s* cmd, const std::int32_t fps)
+//{
+//	if (CG_IsOnGround(_ps))
+//		return true;
+//
+//	playerState_s ps_local = *_ps;
+//	auto pm = PM_Create(&ps_local, cmd, cmd);
+//	CPmoveSimulation sim(&pm);
+//
+//	sim.FPS = 333;
+//	sim.Simulate();
+//
+//	memcpy(&pm.oldcmd, &pm.cmd, sizeof(usercmd_s));
+//
+//	sim.FPS = fps == 0 ? 1000 : fps;
+//	sim.Simulate();
+//
+//	return pm.ps->velocity[Z] >= 0.f && !sim.GetPML()->walking;
+//}
+//
 
-/*
-static bool CJ_PlayerWillBeOnTheGroundAfterFrame(const playerState_s* _ps, const usercmd_s* cmd, const std::int32_t fps)
-{
-	if (CG_IsOnGround(_ps))
-		return true;
-
-	playerState_s ps_local = *_ps;
-	auto pm = PM_Create(&ps_local, cmd, cmd);
-	CPmoveSimulation sim(&pm);
-
-	sim.FPS = fps == 0 ? 1000 : fps;
-	sim.Simulate();
-
-	return pm.ps->velocity[Z] >= 0.f && !sim.GetPML()->walking;
-}
-
-
-static bool CJ_WillPlayerSlideOnTheSurface(const playerState_s* _ps, const usercmd_s* cmd, std::int32_t fps)
-{
-
-	playerState_s ps_local = *_ps;
-	auto pm = PM_Create(&ps_local, cmd, cmd);
-	const auto ps = pm.ps;
-
-	CPmoveSimulation sim(&pm);
-	sim.FPS = fps == 0 ? 1000 : fps;
-	sim.Simulate();
-	const auto pml = sim.GetPML();
-
-	if (ps->velocity[Z] >= 0.f && !pml->walking) {
-
-		const auto newVelocity = fvec2(pm.ps->velocity).mag();
-		const auto oldVelocity = fvec2(_ps->velocity).mag();
-
-		Com_Printf("velDelta: %.6f\n", (newVelocity / oldVelocity) * 100.f);
-		return true;
-	}
-
-	return false;
-}
-
-*/
+//static bool CJ_WillPlayerSlideOnTheSurface(const playerState_s* _ps, const usercmd_s* cmd, std::int32_t fps)
+//{
+//
+//	playerState_s ps_local = *_ps;
+//	auto pm = PM_Create(&ps_local, cmd, cmd);
+//	const auto ps = pm.ps;
+//
+//	CPmoveSimulation sim(&pm);
+//	sim.FPS = fps == 0 ? 1000 : fps;
+//	sim.Simulate();
+//	const auto pml = sim.GetPML();
+//
+//	if (ps->velocity[Z] >= 0.f && !pml->walking) {
+//
+//		const auto newVelocity = fvec2(pm.ps->velocity).mag();
+//		const auto oldVelocity = fvec2(_ps->velocity).mag();
+//
+//		Com_Printf("velDelta: %.6f\n", (newVelocity / oldVelocity) * 100.f);
+//		return true;
+//	}
+//
+//	return false;
+//}
