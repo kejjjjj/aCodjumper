@@ -30,6 +30,7 @@ void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[ma
 			.m_bIgnorePitch = true,
 			.m_bIgnoreWASD = true,
 			.m_bSetComMaxfps = false,
+			.m_bNoLag = true,
 			.m_bRenderExpectationVsReality = debugRender
 		}
 	);
@@ -42,6 +43,7 @@ void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[ma
 			.m_bIgnorePitch = true,
 			.m_bIgnoreWASD = true,
 			.m_bSetComMaxfps = false,
+			.m_bNoLag = true,
 			.m_bRenderExpectationVsReality = false
 		}
 
@@ -328,10 +330,15 @@ bool CJ_InTransferZone(const playerState_s* ps, usercmd_s* cmd)
 
 }
 
-bool CJ_Bhop([[maybe_unused]]const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd)
+bool CJ_Bhop([[maybe_unused]]const playerState_s* ps, usercmd_s* cmd, usercmd_s* oldcmd)
 {
+	if (ps->groundEntityNum == 1023 || !NVar_FindMalleableVar<bool>("Bhop")->Get())
+		return false;
 
-	if (NVar_FindMalleableVar<bool>("Bhop")->Get() && (cmd->buttons & cmdEnums::jump) != 0) {
+	if (playersKb[KB_GOSTAND].active && (cmd->buttons & cmdEnums::jump) == 0)
+		cmd->buttons |= cmdEnums::jump;
+
+	if ((cmd->buttons & cmdEnums::jump) != 0) {
 		if ((cmd->buttons & cmdEnums::jump) != 0 && (oldcmd->buttons & cmdEnums::jump) != 0) {
 			cmd->buttons &= ~(cmdEnums::crouch | cmdEnums::crouch_hold);
 			cmd->buttons &= ~cmdEnums::jump;
@@ -366,36 +373,35 @@ bool CJ_Prediction(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* old
 }
 bool CJ_AutoSlide(const playerState_s* _ps, usercmd_s* cmd, const usercmd_s* oldcmd)
 {
-	playerState_s ps_local = *_ps;
-	auto pm = PM_Create(&ps_local, cmd, cmd);
-	const auto ps = pm.ps;
-
-	PM_Weapon_Idle(pm.ps);
-
 	const auto frameTime = (cmd->serverTime - oldcmd->serverTime);
 
+	playerState_s ps_local = *_ps;
+	auto pm = PM_Create(&ps_local, cmd, cmd);
+	const playerState_s* ps = pm.ps;
+
 	CPmoveSimulation sim(&pm);
-	const auto pml = sim.GetPML();
-	sim.FPS = 10;
+	sim.FPS = 1000 / (frameTime == 0 ? 3 : frameTime);
 	sim.Simulate();
 
+	if (!CG_IsOnGround(pm.ps))
+		return false;
 
-	const auto goodVel = ps->velocity[2] < 10.f && ps->velocity[2] >= 0.f;
-	const auto goodOrg = _ps->origin[Z] >= ps->origin[Z];
+	ps_local = *_ps;
+	pm = PM_Create(&ps_local, cmd, cmd);
+	ps = pm.ps;
+	const auto fps = NVar_FindMalleableVar<bool>("Auto Slide")->GetChild("FPS")->As<ImNVar<int>>()->Get();
+	sim.FPS = std::clamp(fps, 1, 1000);
+	sim.Simulate();
 
-	if (!pml->walking && goodVel && goodOrg && pml->impactSpeed != 0.f) {
-		const auto firstCmd = CJ_StateToPlayback(pm.ps, pm.cmd, pm.oldcmd);
+	if (CG_IsOnGround(pm.ps) && sim.GetPML()->impactSpeed != 0.f)
+		return false;
 
-		pm.oldcmd.serverTime = pm.cmd.serverTime;
-		pm.cmd.serverTime += frameTime;
-
-		const auto secondCmd = CJ_StateToPlayback(pm.ps, pm.cmd, pm.oldcmd);
-
-		CJ_PushPlayback({ firstCmd, secondCmd });
-		return true;
-	}
-
-	return false;
+	const auto firstCmd = CJ_StateToPlayback(pm.ps, pm.cmd, pm.oldcmd);
+	pm.oldcmd.serverTime = pm.cmd.serverTime;
+	pm.cmd.serverTime += frameTime;
+	const auto secondCmd = CJ_StateToPlayback(pm.ps, pm.cmd, pm.oldcmd);
+	CJ_PushPlayback({ firstCmd, secondCmd });
+	return true;
 
 }
 void CJ_EdgeJump(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd)

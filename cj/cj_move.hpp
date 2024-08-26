@@ -19,7 +19,7 @@ bool CJ_AutoPara(playerState_s* ps, usercmd_s* cmd);
 void CJ_Force250(playerState_s* ps, usercmd_s* cmd);
 
 [[nodiscard]] bool CJ_InTransferZone(const playerState_s* ps, usercmd_s* cmd);
-[[nodiscard]] bool CJ_Bhop(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd);
+[[nodiscard]] bool CJ_Bhop(const playerState_s* ps, usercmd_s* cmd, usercmd_s* oldcmd);
 
 [[nodiscard]] bool CJ_Prediction(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd);
 
@@ -27,3 +27,4 @@ void CJ_Force250(playerState_s* ps, usercmd_s* cmd);
 void CJ_EdgeJump(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd);
 
 [[maybe_unused]] bool CJ_ForceStrafeInFPS(playerState_s* ps, usercmd_s* cmd, const int FPS);
+

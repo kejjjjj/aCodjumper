@@ -30,16 +30,7 @@ void CG_DrawActive()
 	if (const auto pb = CStaticMovementRecorder::Instance->GetDebugPlayback())
 		pb->CG_Render();
 
-	const std::string text = std::format(
-		"x:      {:.6f}\n"
-		"y:      {:.6f}\n"
-		"z:      {:.6f}\n"
-		"yaw: {:.6f}\n",
-		clients->cgameOrigin[0],
-		clients->cgameOrigin[1],
-		clients->cgameOrigin[2],
-		clients->cgameViewangles[YAW]);
-
+	const std::string text = std::format("buttons: {}", CL_GetUserCmd(clients->cmdNumber-1)->buttons);
 	R_AddCmdDrawTextWithEffects(text, "fonts/normalFont", fvec2{ 310, 400 }, { 0.4f, 0.5f }, 0.f, 3, vec4_t{ 1,1,1,1 }, vec4_t{ 1,0,0,0 });
 #endif
 
