@@ -29,8 +29,11 @@ void NVar_CreateVars(NVarTable * table)
         Strafebot->AddImChild<int, ImDragInt>("Persistence ms", 250, NVar_ArithmeticToString<int>, nvar_saved, 0, 2000)
             ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "how long the strafebot will keep pressing these keys after releasing the input");
 
-        Strafebot->AddImChild<float, ImDragFloat>("Smoothing", 0.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 0.9999f, "%.2f")
-            ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "more smoothing = less acceleration");
+        Strafebot->AddImChild<float, ImDragFloat>("Strafe assist", 0.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 9999.f, "%.2f", 0.5f)
+            ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "the max yawspeed that the strafebot will correct your strafes by (allows mouse input)");
+
+        Strafebot->AddImChild<float, ImDragFloat>("Overstrafe assist", 0.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 9999.f, "%.2f", 0.5f)
+            ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "the max yawspeed that the strafebot correct your overstrafes by (disables strafebot for understrafing, but can work with strafe assist)");
 
 
         Strafebot->AddImChild<bool, ImCheckbox>("Fullbeat only", true, NVar_ArithmeticToString<bool>, nvar_saved);

@@ -85,6 +85,13 @@ void CJ_FixedTime(usercmd_s* cmd, usercmd_s* oldcmd)
 	}
 }
 
+float CJ_limit_turn_rate(float delta, float max_deg_per_second, float frametime) {
+	float max_turn_this_frame = max_deg_per_second * frametime;
+	if (std::abs(delta) <= max_turn_this_frame) {
+		return delta;
+	}
+	return std::copysign(max_turn_this_frame, delta);
+}
 
 void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 {
@@ -98,7 +105,7 @@ void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 
 	const auto ps = &cgs->predictedPlayerState;
 
-	if(!CJ_AutoPara(ps, cmd))
+	if (!CJ_AutoPara(ps, cmd))
 		CJ_Force250(ps, cmd);
 
 
@@ -108,8 +115,8 @@ void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 
 	const auto persistence = Strafebot->GetChild("Persistence ms")->As<ImNVar<int>>()->Get();
 	const auto fullbeat_only = Strafebot->GetChild("Fullbeat only")->As<ImNVar<bool>>()->Get();
-	const auto smoothing = Strafebot->GetChild("Smoothing")->As<ImNVar<float>>()->Get();
-
+	const auto assist_yawspeed_cap = Strafebot->GetChild("Strafe assist")->As<ImNVar<float>>()->Get();
+	const auto overstrafe_assist_yawspeed_cap = Strafebot->GetChild("Overstrafe assist")->As<ImNVar<float>>()->Get();
 
 	//persistence
 	if (rightmove_was_pressed_this_frame == false) {
@@ -138,11 +145,36 @@ void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 
 	auto delta = *yaw;
 
-	if (std::fabsf(delta) > 5.f)
-		delta = CG_SmoothAngle(0.f, delta, smoothing);
 
-	CL_SetPlayerYaw(cmd, ps->delta_angles, ps->viewangles[YAW] + delta);
+	// surely xkej will refactor this into separate smaller functions later because now this looks very messy but i am very lazy
+
+	constexpr auto same_sign = [](char a, float b) { return (a >= 0 && b >= 0) || (a < 0 && b < 0); };
+
+	const auto frametime = (cmd->serverTime - oldcmd->serverTime) / 1000.f;
+	const auto user_yaw_delta_this_frame = AngleDelta(SHORT2ANGLE(cmd->angles[YAW]), SHORT2ANGLE(oldcmd->angles[YAW]));
+	auto delta_from_user_yaw = delta - user_yaw_delta_this_frame;
+	const bool is_overstrafing = same_sign(cmd->rightmove, delta_from_user_yaw);
+
+	// todo: figure out either: a good value for this, a good way to set this dynamically, or just make it an option 
+	constexpr auto MAX_OVERSTRAFE_ACTIVATION_ANGLE = 5.f;
+	
+	// todo: limit overstrafe assist to airmove only?
+	if (is_overstrafing && overstrafe_assist_yawspeed_cap > 0.f && fabs(delta_from_user_yaw) <= MAX_OVERSTRAFE_ACTIVATION_ANGLE) {
+		delta_from_user_yaw = CJ_limit_turn_rate(delta_from_user_yaw, overstrafe_assist_yawspeed_cap, frametime);
+	} else if (assist_yawspeed_cap > 0.f) {
+		delta_from_user_yaw = CJ_limit_turn_rate(delta_from_user_yaw, assist_yawspeed_cap, frametime);
+	}
+
+	if (overstrafe_assist_yawspeed_cap == 0.f && assist_yawspeed_cap == 0.f)
+	{
+		CL_SetPlayerYaw(cmd, ps->delta_angles, ps->viewangles[YAW] + delta);
+	}
+	else {
+		clients->viewangles[YAW] += delta_from_user_yaw;
+		cmd->angles[YAW] = ANGLE2SHORT(clients->viewangles[YAW]);
+	}
 }
+
 bool CJ_AutoPara(playerState_s* ps, usercmd_s* cmd)
 {
 	const auto autoPara = NVar_FindMalleableVar<bool>("Strafebot")->GetChildAs<ImNVar<bool>>("Auto Para");
