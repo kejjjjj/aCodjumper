@@ -7,7 +7,7 @@
 
 #include "utils/typedefs.hpp"
 
-void CJ_AutoRPG(playerState_s* ps, usercmd_s* cmd, usercmd_s* oldcmd)
+void CJ_AutoRPG(const playerState_s* ps, usercmd_s* cmd, usercmd_s* oldcmd)
 {
 	static float delta_per_frame = {};
 

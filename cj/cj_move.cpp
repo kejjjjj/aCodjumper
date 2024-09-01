@@ -36,7 +36,11 @@ void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[ma
 	);
 #else
 
-	CMain::Shared::GetFunctionOrExit("AddPlaybackC")->As<void, const std::vector<playback_cmd>&, const CPlaybackSettings&>()->Call(
+	const auto func = CMain::Shared::GetFunctionSafe("AddPlaybackC");
+	if (!func)
+		return;
+
+	func->As<void, const std::vector<playback_cmd>&, const CPlaybackSettings&>()->Call(
 		cmds,
 		{
 			.m_eJumpSlowdownEnable = slowdown_t::both,
@@ -80,6 +84,8 @@ void CJ_FixedTime(usercmd_s* cmd, usercmd_s* oldcmd)
 		cmd->serverTime = oldcmd->serverTime + (1000 / SafeFPS);
 	}
 }
+
+
 void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 {
 	if (!NVar_FindMalleableVar<bool>("Strafebot")->Get())
@@ -94,6 +100,7 @@ void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 
 	if(!CJ_AutoPara(ps, cmd))
 		CJ_Force250(ps, cmd);
+
 
 	const bool rightmove_was_pressed_this_frame = cmd->rightmove != NULL;
 
