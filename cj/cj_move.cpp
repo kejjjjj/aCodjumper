@@ -93,6 +93,7 @@ float CJ_limit_turn_rate(float delta, float max_deg_per_second, float frametime)
 	return std::copysign(max_turn_this_frame, delta);
 }
 
+
 void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 {
 	if (!NVar_FindMalleableVar<bool>("Strafebot")->Get())
@@ -145,33 +146,34 @@ void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 
 	auto delta = *yaw;
 
-
-	// surely xkej will refactor this into separate smaller functions later because now this looks very messy but i am very lazy
-
-	constexpr auto same_sign = [](char a, float b) { return (a >= 0 && b >= 0) || (a < 0 && b < 0); };
-
-	const auto frametime = (cmd->serverTime - oldcmd->serverTime) / 1000.f;
-	const auto user_yaw_delta_this_frame = AngleDelta(SHORT2ANGLE(cmd->angles[YAW]), SHORT2ANGLE(oldcmd->angles[YAW]));
-	auto delta_from_user_yaw = delta - user_yaw_delta_this_frame;
-	const bool is_overstrafing = same_sign(cmd->rightmove, delta_from_user_yaw);
-
-	// todo: figure out either: a good value for this, a good way to set this dynamically, or just make it an option 
-	constexpr auto MAX_OVERSTRAFE_ACTIVATION_ANGLE = 5.f;
-	
-	// todo: limit overstrafe assist to airmove only?
-	if (is_overstrafing && overstrafe_assist_yawspeed_cap > 0.f && fabs(delta_from_user_yaw) <= MAX_OVERSTRAFE_ACTIVATION_ANGLE) {
-		delta_from_user_yaw = CJ_limit_turn_rate(delta_from_user_yaw, overstrafe_assist_yawspeed_cap, frametime);
-	} else if (assist_yawspeed_cap > 0.f) {
-		delta_from_user_yaw = CJ_limit_turn_rate(delta_from_user_yaw, assist_yawspeed_cap, frametime);
-	}
-
 	if (overstrafe_assist_yawspeed_cap == 0.f && assist_yawspeed_cap == 0.f)
 	{
 		CL_SetPlayerYaw(cmd, ps->delta_angles, ps->viewangles[YAW] + delta);
 	}
 	else {
-		clients->viewangles[YAW] += delta_from_user_yaw;
-		cmd->angles[YAW] = ANGLE2SHORT(clients->viewangles[YAW]);
+
+		// surely xkej will refactor this into separate smaller functions later because now this looks very messy but i am very lazy
+
+		constexpr auto same_sign = [](char a, float b) { return (a >= 0 && b >= 0) || (a < 0 && b < 0); };
+
+		const auto frametime = (cmd->serverTime - oldcmd->serverTime) / 1000.f;
+		const auto user_yaw_delta_this_frame = AngleDelta(SHORT2ANGLE(cmd->angles[YAW]), SHORT2ANGLE(oldcmd->angles[YAW]));
+		delta -= user_yaw_delta_this_frame;
+
+		const bool in_air = !CG_IsOnGround(ps);
+		const bool is_overstrafing = same_sign(cmd->rightmove, delta);
+
+		// todo: figure out either: a good value for this, a good way to set this dynamically, or just make it an option 
+		constexpr auto MAX_OVERSTRAFE_ACTIVATION_ANGLE = 5.f;
+		auto zerovec = vec3_t{ 0,0,0 };
+
+		if (in_air && is_overstrafing && overstrafe_assist_yawspeed_cap > 0.f && fabs(delta) <= MAX_OVERSTRAFE_ACTIVATION_ANGLE) {
+			delta = CJ_limit_turn_rate(delta, overstrafe_assist_yawspeed_cap, frametime);
+			CL_SetPlayerYaw(cmd, zerovec, clients->viewangles[YAW] + delta);
+		} else if (assist_yawspeed_cap > 0.f) {
+			delta = CJ_limit_turn_rate(delta, assist_yawspeed_cap, frametime);
+			CL_SetPlayerYaw(cmd, zerovec, clients->viewangles[YAW] + delta);
+		}
 	}
 }
 
