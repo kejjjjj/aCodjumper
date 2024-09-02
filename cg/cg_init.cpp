@@ -32,9 +32,14 @@ void NVar_CreateVars(NVarTable * table)
         Strafebot->AddImChild<float, ImDragFloat>("Strafe assist", 0.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 9999.f, "%.2f", 0.5f)
             ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "the max yawspeed that the strafebot will correct your strafes by (allows mouse input)");
 
-        Strafebot->AddImChild<float, ImDragFloat>("Overstrafe assist", 0.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 9999.f, "%.2f", 0.5f)
-            ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "the max yawspeed that the strafebot correct your overstrafes by (disables strafebot for understrafing, but can work with strafe assist)");
+        auto osAssist = Strafebot->AddImChild<float, ImDragFloat>("Overstrafe assist", 0.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 9999.f, "%.2f", 0.5f);
+        osAssist->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "the max yawspeed that the strafebot correct your overstrafes by (disables strafebot for understrafing, but can work with strafe assist)");
 
+        {
+            osAssist->AddImChild<float, ImDragFloat>("Activation angle", 10.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 90.f, "%.2f", 0.5f)
+                ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "how many degrees of overstrafe will be corrected");
+
+        }
 
         Strafebot->AddImChild<bool, ImCheckbox>("Fullbeat only", true, NVar_ArithmeticToString<bool>, nvar_saved);
 
@@ -137,15 +142,17 @@ void CG_Init()
 #include "cl/cl_move.hpp"
 void CG_Init()
 {
+    auto numAttempts = 0u;
     while (!CMain::Shared::AddFunction || !CMain::Shared::GetFunction) {
         std::this_thread::sleep_for(200ms);
+
+        if (++numAttempts > 25u) {
+            return CG_SafeErrorExit("It seems that the module " + std::string(NVAR_TABLE_NAME) + " couldn't get a connection to the main module");
+        }
     }
 
-    while (!dx || !dx->device)
-        std::this_thread::sleep_for(100ms);
-
     Sys_SuspendAllThreads();
-    std::this_thread::sleep_for(300ms);
+    std::this_thread::sleep_for(20ms);
 
     COD4X::initialize();
     NVarTables::tables = CMain::Shared::GetFunctionOrExit("GetNVarTables")->As<nvar_tables_t*>()->Call();

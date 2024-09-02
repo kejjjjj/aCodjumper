@@ -28,6 +28,7 @@ void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[ma
 		{
 			.m_eJumpSlowdownEnable= slowdown_t::both,
 			.m_bIgnorePitch = true,
+			.m_bIgnoreWeapon = true,
 			.m_bIgnoreWASD = true,
 			.m_bSetComMaxfps = false,
 			.m_bNoLag = true,
@@ -45,6 +46,7 @@ void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[ma
 		{
 			.m_eJumpSlowdownEnable = slowdown_t::both,
 			.m_bIgnorePitch = true,
+			.m_bIgnoreWeapon = true,
 			.m_bIgnoreWASD = true,
 			.m_bSetComMaxfps = false,
 			.m_bNoLag = true,
@@ -118,6 +120,7 @@ void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 	const auto fullbeat_only = Strafebot->GetChild("Fullbeat only")->As<ImNVar<bool>>()->Get();
 	const auto assist_yawspeed_cap = Strafebot->GetChild("Strafe assist")->As<ImNVar<float>>()->Get();
 	const auto overstrafe_assist_yawspeed_cap = Strafebot->GetChild("Overstrafe assist")->As<ImNVar<float>>()->Get();
+	const auto overstrafe_assist_activation_angle = Strafebot->GetChild("Overstrafe assist")->GetChild("Activation angle")->As<ImNVar<float>>()->Get();
 
 	//persistence
 	if (rightmove_was_pressed_this_frame == false) {
@@ -164,10 +167,9 @@ void CJ_Strafebot(usercmd_s* cmd, usercmd_s* oldcmd)
 		const bool is_overstrafing = same_sign(cmd->rightmove, delta);
 
 		// todo: figure out either: a good value for this, a good way to set this dynamically, or just make it an option 
-		constexpr auto MAX_OVERSTRAFE_ACTIVATION_ANGLE = 5.f;
 		auto zerovec = vec3_t{ 0,0,0 };
 
-		if (in_air && is_overstrafing && overstrafe_assist_yawspeed_cap > 0.f && fabs(delta) <= MAX_OVERSTRAFE_ACTIVATION_ANGLE) {
+		if (in_air && is_overstrafing && overstrafe_assist_yawspeed_cap > 0.f && fabs(delta) <= overstrafe_assist_activation_angle) {
 			delta = CJ_limit_turn_rate(delta, overstrafe_assist_yawspeed_cap, frametime);
 			CL_SetPlayerYaw(cmd, zerovec, clients->viewangles[YAW] + delta);
 		} else if (assist_yawspeed_cap > 0.f) {
