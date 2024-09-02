@@ -23,13 +23,13 @@ void CJ_AutoRPG(const playerState_s* ps, usercmd_s* cmd, usercmd_s* oldcmd)
 
 	//safeguard
 	if (ps->weaponDelay <= (deltaTime * 2)) {
-		cmd->angles[PITCH] = ANGLE2SHORT(AngleDelta(85.f, ps->delta_angles[PITCH]));
+		cmd->angles[PITCH] = ANGLE2SHORT(AngleDelta(84.9999f, ps->delta_angles[PITCH]));
 		return;
 	}
 
-	const float interpolation = static_cast<float>(deltaTime) / ps->weaponDelay;
+	//const float interpolation = static_cast<float>(deltaTime) / ps->weaponDelay;
 
 
-	delta_per_frame = interpolation * AngularDistance(ps->viewangles[PITCH], 85);
-	cmd->angles[PITCH] = ANGLE2SHORT(AngleDelta(ps->viewangles[PITCH] + delta_per_frame, ps->delta_angles[PITCH]));
+	//delta_per_frame = interpolation * AngularDistance(ps->viewangles[PITCH], 85);
+	//cmd->angles[PITCH] = ANGLE2SHORT(AngleDelta(ps->viewangles[PITCH] + delta_per_frame, ps->delta_angles[PITCH]));
 }
