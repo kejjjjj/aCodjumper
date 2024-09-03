@@ -29,14 +29,14 @@ void NVar_CreateVars(NVarTable * table)
         Strafebot->AddImChild<int, ImDragInt>("Persistence ms", 250, NVar_ArithmeticToString<int>, nvar_saved, 0, 2000)
             ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "how long the strafebot will keep pressing these keys after releasing the input");
 
-        Strafebot->AddImChild<float, ImDragFloat>("Strafe assist", 0.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 9999.f, "%.2f", 0.5f)
+        Strafebot->AddImChild<float, ImDragFloat>("Strafe assist", 0.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 9999.f, 0.5f, "%.2f")
             ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "the max yawspeed that the strafebot will correct your strafes by (allows mouse input)");
 
-        auto osAssist = Strafebot->AddImChild<float, ImDragFloat>("Overstrafe assist", 0.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 9999.f, "%.2f", 0.5f);
+        auto osAssist = Strafebot->AddImChild<float, ImDragFloat>("Overstrafe assist", 0.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 9999.f, 0.5f, "%.2f");
         osAssist->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "the max yawspeed that the strafebot correct your overstrafes by (disables strafebot for understrafing, but can work with strafe assist)");
 
         {
-            osAssist->AddImChild<float, ImDragFloat>("Activation angle", 10.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 90.f, "%.2f", 0.5f)
+            osAssist->AddImChild<float, ImDragFloat>("Activation angle", 10.f, NVar_ArithmeticToString<float>, nvar_saved, 0.f, 90.f, 0.5f, "%.2f")
                 ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "how many degrees of overstrafe will be corrected");
 
         }
