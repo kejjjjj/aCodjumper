@@ -20,7 +20,7 @@
 #include "shared/sv_shared.hpp"
 #endif
 
-void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[maybe_unused]]bool debugRender)
+void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[maybe_unused]]bool debugRender, bool noLag)
 {
 
 #if(DEBUG_SUPPORT)
@@ -31,7 +31,7 @@ void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[ma
 			.m_bIgnoreWeapon = true,
 			.m_bIgnoreWASD = true,
 			.m_bSetComMaxfps = false,
-			.m_bNoLag = true,
+			.m_bNoLag = noLag,
 			.m_bRenderExpectationVsReality = debugRender
 		}
 	);
@@ -49,7 +49,7 @@ void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[ma
 			.m_bIgnoreWeapon = true,
 			.m_bIgnoreWASD = true,
 			.m_bSetComMaxfps = false,
-			.m_bNoLag = true,
+			.m_bNoLag = noLag,
 			.m_bRenderExpectationVsReality = false
 		}
 
@@ -375,18 +375,22 @@ bool CJ_InTransferZone(const playerState_s* ps, usercmd_s* cmd)
 
 bool CJ_Bhop([[maybe_unused]]const playerState_s* ps, usercmd_s* cmd, usercmd_s* oldcmd)
 {
-	if (ps->groundEntityNum == 1023 || !NVar_FindMalleableVar<bool>("Bhop")->Get())
+	const auto bhop = NVar_FindMalleableVar<bool>("Bhop");
+	if (ps->groundEntityNum == 1023 || !bhop->Get())
+		return false;
+
+	if (ps->viewHeightCurrent != 60 && !bhop->GetChild("While Crouched")->As<ImNVar<bool>>()->Get())
 		return false;
 
 	if (playersKb[KB_GOSTAND].active && (cmd->buttons & cmdEnums::jump) == 0)
 		cmd->buttons |= cmdEnums::jump;
 
-	if ((cmd->buttons & cmdEnums::jump) != 0) {
-		if ((cmd->buttons & cmdEnums::jump) != 0 && (oldcmd->buttons & cmdEnums::jump) != 0) {
-			cmd->buttons &= ~(cmdEnums::crouch | cmdEnums::crouch_hold);
-			cmd->buttons &= ~cmdEnums::jump;
-		}
+
+	if ((cmd->buttons & cmdEnums::jump) != 0 && (oldcmd->buttons & cmdEnums::jump) != 0) {
+		cmd->buttons &= ~(cmdEnums::crouch | cmdEnums::crouch_hold);
+		cmd->buttons &= ~cmdEnums::jump;
 	}
+	
 
 	return false;
 }
@@ -398,9 +402,10 @@ bool CJ_Prediction(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* old
 
 	const auto autoSlide = NVar_FindMalleableVar<bool>("Auto Slide")->Get();
 	const auto edgeJump = NVar_FindMalleableVar<bool>("Edge Jump")->Get();
+	const auto easyBounces = NVar_FindMalleableVar<bool>("Easy Bounces")->Get();
 
 	//don't calculate for no reason
-	if (!autoSlide && !edgeJump)
+	if (!autoSlide && !edgeJump && !easyBounces)
 		return false;
 
 	const auto bGrounded = CG_IsOnGround(ps);
@@ -410,6 +415,9 @@ bool CJ_Prediction(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* old
 	
 	if(bGrounded && edgeJump)
 		CJ_EdgeJump(ps, cmd, cmd);
+
+	if (easyBounces && CJ_EasyBounces(ps, cmd, oldcmd))
+		return true;
 
 	return false;
 
@@ -468,6 +476,73 @@ void CJ_EdgeJump(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcm
 		cmd->buttons |= cmdEnums::jump;
 	}
 
+}
+[[nodiscard]] bool CJ_EasyBounces(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcmd)
+{
+	
+	static bool waitForGround = false;
+	static int waitFrames = 0;
+
+	if (waitFrames && --waitFrames)
+		return false;
+
+	if (CG_IsOnGround(ps)) {
+		waitForGround = false;
+		return false;
+	}
+
+	if (ps->velocity[Z] > 0 || CG_HasBounced(ps) || waitForGround)
+		return false;
+
+	const auto curYaw = AngleNormalize180(ANGLE2SHORT(cmd->angles[YAW]) + ps->delta_angles[YAW]);
+	const auto oldYaw = AngleNormalize180(ANGLE2SHORT(oldcmd->angles[YAW]) + ps->delta_angles[YAW]);
+
+	playerState_s ps_local = *ps;
+	auto pm = PM_Create(&ps_local, cmd, oldcmd);
+
+	CSimulationController c;
+	c.forwardmove = rand() % 1 == 0 ? 127 : -127;
+	c.rightmove = pm.cmd.rightmove;
+	c.weapon = pm.cmd.weapon;
+	c.offhand = pm.cmd.offHandIndex;
+	c.FPS = Dvar_FindMalleableVar("com_maxfps")->current.integer;
+	c.viewangles.angle_enum = EViewAngle::FixedTurn;
+	c.viewangles.viewangles = { 0.f, std::clamp(curYaw - oldYaw, -0.1f, 0.1f), 0.f };
+
+	CPmoveSimulation sim(&pm, c);
+
+	std::vector<playback_cmd> cmds;
+	cmds.emplace_back(CJ_StateToPlayback(pm.ps, pm.cmd, pm.oldcmd));
+	memcpy(&pm.oldcmd, &pm.cmd, sizeof(usercmd_s));
+
+	const auto numInputs = std::int32_t(c.FPS / 1.5f);
+	const auto oldZ = pm.ps->velocity[Z];
+
+	for ([[maybe_unused]]const auto i : std::views::iota(0, numInputs)) {
+		
+		sim.rightmove = rand() % 1 == 0 ? 127 : -127;
+
+		sim.Simulate();
+		cmds.emplace_back(CJ_StateToPlayback(pm.ps, pm.cmd, pm.oldcmd));
+		memcpy(&pm.oldcmd, &pm.cmd, sizeof(usercmd_s));
+
+		if (CG_IsOnGround(pm.ps)) {
+			waitFrames = 3;
+			return false;
+		}
+
+		if (CG_HasBounced(pm.ps) && pm.ps->velocity[Z] > std::abs(oldZ) * 0.5f) {
+			CJ_PushPlayback(cmds, false, false);
+			//Com_Printf("^5bunce!\n");
+			waitForGround = true;
+			return true;
+		}
+
+	}
+
+	waitFrames = 3;
+
+	return false;
 }
 //
 //static bool CJ_PlayerWillBeOnTheGroundAfterFrame(const playerState_s* _ps, const usercmd_s* cmd, const std::int32_t fps)

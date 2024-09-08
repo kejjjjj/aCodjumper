@@ -80,8 +80,13 @@ void NVar_CreateVars(NVarTable * table)
     table->AddImNvar<bool, ImCheckbox>("RPG Lookdown", false, NVar_ArithmeticToString<bool>)
         ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "automatically adjust pitch when shooting the rpg");
 
-    table->AddImNvar<bool, ImCheckbox>("Bhop", false, NVar_ArithmeticToString<bool>)
-        ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "hold to jump instead of press to jump");
+    auto bhop = table->AddImNvar<bool, ImCheckbox>("Bhop", false, NVar_ArithmeticToString<bool>);
+    bhop->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "hold to jump instead of press to jump");
+
+    {
+        bhop->AddImChild<bool, ImCheckbox>("While Crouched", false, NVar_ArithmeticToString<bool>, nvar_saved)
+            ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "bhop while crouched");
+    }
 
     const auto autoSlide = table->AddImNvar<bool, ImCheckbox>("Auto Slide", false, NVar_ArithmeticToString<bool>);
     autoSlide->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "automatically slide all edges");
@@ -95,6 +100,9 @@ void NVar_CreateVars(NVarTable * table)
 
     table->AddImNvar<bool, ImCheckbox>("Edge Jump", false, NVar_ArithmeticToString<bool>)
         ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "jump before falling off an edge");
+
+    table->AddImNvar<bool, ImCheckbox>("Easy Bounces", false, NVar_ArithmeticToString<bool>)
+        ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "makes it much easier to hit bounces");
 
 }
 
