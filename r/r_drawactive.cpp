@@ -27,8 +27,8 @@ void CG_DrawActive()
 
 #if(DEBUG_SUPPORT)
 
-	if (const auto pb = CStaticMovementRecorder::Instance->GetDebugPlayback())
-		pb->CG_Render();
+	//if (const auto pb = CStaticMovementRecorder::Instance->GetDebugPlayback())
+	//	pb->CG_Render();
 
 	const std::string text = std::format("buttons: {}", CL_GetUserCmd(clients->cmdNumber-1)->buttons);
 	R_AddCmdDrawTextWithEffects(text, "fonts/normalFont", fvec2{ 310, 400 }, { 0.4f, 0.5f }, 0.f, 3, vec4_t{ 1,1,1,1 }, vec4_t{ 1,0,0,0 });
