@@ -432,6 +432,8 @@ bool CJ_AutoSlide(const playerState_s* _ps, usercmd_s* cmd, const usercmd_s* old
 
 	CPmoveSimulation sim(&pm);
 	sim.FPS = 1000 / (frameTime == 0 ? 3 : frameTime);
+	sim.buttons = cmd->buttons;
+	sim.weapon = cmd->weapon;
 	sim.Simulate();
 
 	if (!CG_IsOnGround(pm.ps))
