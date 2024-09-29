@@ -19,8 +19,9 @@
 #else
 #include "shared/sv_shared.hpp"
 #endif
+#include <utils/engine.hpp>
 
-void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[maybe_unused]]bool debugRender, bool noLag)
+void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[maybe_unused]]bool debugRender, bool noLag, bool com_maxfps)
 {
 
 #if(DEBUG_SUPPORT)
@@ -30,7 +31,7 @@ void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[ma
 			.m_bIgnorePitch = true,
 			.m_bIgnoreWeapon = true,
 			.m_bIgnoreWASD = true,
-			.m_bSetComMaxfps = false,
+			.m_bSetComMaxfps = com_maxfps,
 			.m_bNoLag = noLag,
 			.m_bRenderExpectationVsReality = debugRender
 		}
@@ -48,7 +49,7 @@ void CJ_PushPlayback([[maybe_unused]]const std::vector<playback_cmd>& cmds, [[ma
 			.m_bIgnorePitch = true,
 			.m_bIgnoreWeapon = true,
 			.m_bIgnoreWASD = true,
-			.m_bSetComMaxfps = false,
+			.m_bSetComMaxfps = com_maxfps,
 			.m_bNoLag = noLag,
 			.m_bRenderExpectationVsReality = false
 		}
@@ -410,14 +411,15 @@ bool CJ_Prediction(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* old
 
 	const auto bGrounded = CG_IsOnGround(ps);
 
+	if (easyBounces && CJ_EasyBounces(ps, cmd, oldcmd))
+		return true;
+
 	if (!bGrounded && autoSlide && CJ_AutoSlide(ps, cmd, oldcmd))
 		return true;
 	
 	if(bGrounded && edgeJump)
 		CJ_EdgeJump(ps, cmd, cmd);
 
-	if (easyBounces && CJ_EasyBounces(ps, cmd, oldcmd))
-		return true;
 
 	return false;
 
@@ -442,7 +444,12 @@ bool CJ_AutoSlide(const playerState_s* _ps, usercmd_s* cmd, const usercmd_s* old
 	ps_local = *_ps;
 	pm = PM_Create(&ps_local, cmd, cmd);
 	ps = pm.ps;
-	const auto fps = NVar_FindMalleableVar<bool>("Auto Slide")->GetChild("FPS")->As<ImNVar<int>>()->Get();
+
+	auto autoSlide = NVar_FindMalleableVar<bool>("Auto Slide");
+
+	const auto fps = autoSlide->GetChild("FPS")->As<ImNVar<int>>()->Get();
+	const auto com_maxfps = autoSlide->GetChild("com_maxfps")->As<ImNVar<bool>>()->Get();
+
 	sim.FPS = std::clamp(fps, 1, 1000);
 	sim.Simulate();
 
@@ -453,7 +460,7 @@ bool CJ_AutoSlide(const playerState_s* _ps, usercmd_s* cmd, const usercmd_s* old
 	pm.oldcmd.serverTime = pm.cmd.serverTime;
 	pm.cmd.serverTime += frameTime;
 	const auto secondCmd = CJ_StateToPlayback(pm.ps, pm.cmd, pm.oldcmd);
-	CJ_PushPlayback({ firstCmd, secondCmd });
+	CJ_PushPlayback({ firstCmd, secondCmd }, false, true, com_maxfps);
 	return true;
 
 }
@@ -508,6 +515,7 @@ void CJ_EdgeJump(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcm
 	c.weapon = pm.cmd.weapon;
 	c.offhand = pm.cmd.offHandIndex;
 	c.FPS = Dvar_FindMalleableVar("com_maxfps")->current.integer;
+	c.buttons = pm.cmd.buttons;
 	c.viewangles.angle_enum = EViewAngle::FixedTurn;
 	c.viewangles.viewangles = { 0.f, std::clamp(curYaw - oldYaw, -0.1f, 0.1f), 0.f };
 
@@ -543,6 +551,59 @@ void CJ_EdgeJump(const playerState_s* ps, usercmd_s* cmd, const usercmd_s* oldcm
 	}
 
 	waitFrames = 3;
+
+	return false;
+}
+bool CJ_BounceFPS(const playerState_s* ps, const usercmd_s* cmd, const usercmd_s* oldcmd)
+{
+	static int fpsBeforeBounce = 0;
+	static bool hasBounced = false;
+
+	const auto bounceFPS = NVar_FindMalleableVar<bool>("Bounce FPS");
+
+	if (CG_IsOnGround(ps)) {
+
+		if(hasBounced)
+			Dvar_FindMalleableVar("com_maxfps")->current.integer = fpsBeforeBounce;
+		hasBounced = false;
+		return false;
+	}
+
+	if (ps->pm_type != PM_NORMAL || !bounceFPS->Get())
+		return false;
+
+	playerState_s ps_local = *ps;
+	auto pm = PM_Create(&ps_local, cmd, oldcmd);
+	pml_t pml{};
+
+	Engine::Tools::write_bytes(0x537D10, "\xC3");
+
+	__asm
+	{
+		lea eax, pml;
+		push eax;
+		lea eax, pm;
+		push eax;
+		mov esi, 0x410660;
+		call esi;
+		add esp, 8;
+	}
+
+	Engine::Tools::write_bytes(0x537D10, "\x81");
+
+	if (pml.groundPlane && (pml.groundTrace.normal[Z] >= 0.3f && pml.groundTrace.normal[Z] <= 0.7f)) {
+		
+		if(!hasBounced)
+			fpsBeforeBounce = Dvar_FindMalleableVar("com_maxfps")->current.integer;
+		Dvar_FindMalleableVar("com_maxfps")->current.integer = bounceFPS->GetChild("FPS")->As<ImNVar<int>>()->Get();
+		hasBounced = true;
+		return true;
+
+	} else if (hasBounced) {
+		Dvar_FindMalleableVar("com_maxfps")->current.integer = fpsBeforeBounce;
+		hasBounced = false;
+		return true;
+	}
 
 	return false;
 }
