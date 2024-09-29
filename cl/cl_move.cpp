@@ -60,6 +60,7 @@ void CL_CreateNewCommands([[maybe_unused]] int localClientNum)
 		CJ_Strafebot(cmd, oldcmd);
 		CJ_AutoFPS(cmd);
 		CJ_AutoRPG(ps, cmd, oldcmd);
+		CJ_BounceFPS(ps, cmd, oldcmd);
 	}
 
 	#if(DEBUG_SUPPORT)

@@ -90,11 +90,22 @@ void NVar_CreateVars(NVarTable * table)
 
     const auto autoSlide = table->AddImNvar<bool, ImCheckbox>("Auto Slide", false, NVar_ArithmeticToString<bool>);
     autoSlide->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "automatically slide all edges");
-    
     {
 
         autoSlide->AddImChild<int, ImDragInt>("FPS", 10, NVar_ArithmeticToString<int>, nvar_saved, 1, 1000)
             ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "slide fps");
+
+        autoSlide->AddImChild<bool, ImCheckbox>("com_maxfps", false, NVar_ArithmeticToString<bool>, nvar_saved)
+            ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "use com_maxfps instead");
+
+    }
+
+    const auto bounceFPS = table->AddImNvar<bool, ImCheckbox>("Bounce FPS", false, NVar_ArithmeticToString<bool>);
+    bounceFPS->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "Use a specified fps when hugging a bounce");
+    {
+
+        bounceFPS->AddImChild<int, ImDragInt>("FPS", 10, NVar_ArithmeticToString<int>, nvar_saved, 1, 1000)
+            ->AddWidget<std::string, ImHintString>("hintstring", eWidgetFlags::no_flags, "bounce fps");
 
     }
 
